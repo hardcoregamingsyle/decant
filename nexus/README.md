@@ -1,0 +1,138 @@
+# Nexus DSL
+
+**A minimal language for AI model training & hosting. Turn 300+ lines of boilerplate into ~20 lines of code.**
+
+Nexus is a domain-specific language that lets you specify everything needed to train, fine-tune, or host an LLM in a single readable file. It compiles to VRAM-optimized Python using Unsloth, QLoRA, and Hugging Face Transformers — so anyone with a GPU can train their own AI.
+
+```nexus
+purpose = "fine-tune"
+model.base = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit"
+train.precision = "4bit"
+train.compression = "qlora"
+train.lora.rank = 16
+dataset.path = "databricks/databricks-dolly-15k"
+model.context = 2048
+model.context_extend = 4096
+model.context_method = "yarn"
+train.steps = 100
+train.batch.size = 2
+train.learning.rate = 2e-4
+```
+
+## Quick Start
+
+```bash
+# Install
+pip install nexus-dsl
+
+# Validate your config
+nexus check train.nx
+
+# Generate Python training code (don't run it)
+nexus build train.nx -o train.py
+
+# Generate and run training
+nexus run train.nx
+```
+
+## Language Reference
+
+### Purpose
+```nexus
+purpose = "train"       # Train from scratch (intensive)
+purpose = "fine-tune"   # Fine-tune an existing model (recommended)
+purpose = "host"        # Load and optimize model for inference only
+```
+
+### Model
+```nexus
+model.base = "org/model-name"
+model.source = "huggingface"  # or "local"
+model.local_path = "/path/to/model"  # if source is local
+model.context = 2048
+model.context_extend = 4096
+model.context_method = "yarn"  # yarn, ntk, linear, none
+model.rope.theta = 1000000
+```
+
+### Training
+```nexus
+# Precision & Compression
+train.precision = "4bit"        # 4bit, 8bit, 16bit, 32bit
+train.compression = "qlora"     # qlora, lora, full, none
+
+# LoRA / QLoRA
+train.lora.rank = 16            # 1-512
+train.lora.alpha = 16
+train.lora.dropout = 0.0
+train.lora.targets = "all"      # all, attention, mlp, custom
+
+# Hyper-parameters
+train.steps = 100
+train.epochs = 0
+train.batch.size = 2
+train.gradient.accumulation = 4
+train.learning.rate = 2e-4
+train.warmup.steps = 5
+train.optimizer = "adamw_8bit"
+train.scheduler = "cosine"
+train.weight.decay = 0.0
+train.max.grad.norm = 1.0
+train.seed = 42
+```
+
+### Dataset
+```nexus
+dataset.path = "org/dataset-name"
+dataset.source = "huggingface"  # or "local"
+dataset.format = "alpaca"       # alpaca, chat, text, sharegpt, json
+dataset.split = "train"
+dataset.text.field = "text"
+dataset.local_path = "/path/to/data.json"
+```
+
+### Output
+```nexus
+output.dir = "./outputs"
+output.name = "my-finetuned-model"
+output.push.to.hub = false
+output.hub.id = "my-org/my-model"
+```
+
+## Examples
+
+See the `examples/` directory:
+- `train-llama3-8b.nx` — Fine-tune Llama 3.2 3B on Dolly-15k with QLoRA + YaRN
+- `host-mistral.nx` — Host Mistral 7B with 4-bit quantization and 32K context
+- `train-local-dataset.nx` — Train using a local dataset file
+
+## Error Messages
+
+Nexus translates cryptic Python/CUDA errors into plain English:
+
+| Error | What You'll See |
+|-------|----------------|
+| CUDA OOM | "Your GPU ran out of VRAM — lower batch size or precision" |
+| Module not found | "Missing Python package — run pip install" |
+| Network error | "Could not download — check your internet connection" |
+| File not found | "Resource not found — check the path or model name" |
+| Permission error | "Access denied — you may need to log in to Hugging Face" |
+
+## Architecture
+
+```
+.nx file → Lark Parser → Typed Config → Code Generator → Optimized Python → Execution
+                              ↘                ↙
+                         Validation Engine  (with error translation)
+```
+
+## Requirements
+
+- Python 3.10+
+- CUDA-capable GPU with 6+ GB VRAM (for 3B models with QLoRA)
+- 12+ GB VRAM recommended for 7B models with QLoRA
+- 24+ GB VRAM recommended for 13B+ models
+
+## License
+
+MIT

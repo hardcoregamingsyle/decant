@@ -1,0 +1,20 @@
+# Nexus Configuration — Host Mistral 7B Instruct
+# Loads the model with 4-bit quantization and YaRN context extension.
+# No training — just optimized hosting setup.
+
+purpose = "host"
+
+model.base = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit"
+model.source = "huggingface"
+
+# 4-bit quantization for efficient hosting
+train.precision = "4bit"
+train.compression = "none"
+
+# Extend context from 8K to 32K using YaRN
+model.context = 8192
+model.context_extend = 32768
+model.context_method = "yarn"
+
+output.dir = "./models"
+output.name = "mistral-hosted"
