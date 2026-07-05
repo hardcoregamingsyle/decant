@@ -6,7 +6,6 @@ with validation and sensible defaults for every field.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -42,9 +41,6 @@ LORA_TARGET_MAP: dict[str, list[str]] = {
     ],
     "custom": [],
 }
-
-HF_MODEL_PATTERN = re.compile(r"^[\w\-\.]+/[\w\-\.]+$")
-
 
 # ---------------------------------------------------------------------------
 # Model Configuration
@@ -169,12 +165,14 @@ class DatasetConfig:
         errors: list[str] = []
         if self.source not in VALID_SOURCES:
             errors.append(f"dataset.source must be one of: {', '.join(sorted(VALID_SOURCES))}")
-        if not self.path:
-            errors.append("dataset.path is required")
+        if self.source == "huggingface":
+            if not self.path:
+                errors.append("dataset.path is required when dataset.source = 'huggingface'")
+        else:
+            if not self.local_path:
+                errors.append("dataset.local_path is required when dataset.source = 'local'")
         if self.format not in VALID_FORMATS:
             errors.append(f"dataset.format must be one of: {', '.join(sorted(VALID_FORMATS))}")
-        if self.source == "local" and not self.local_path:
-            errors.append("dataset.local_path is required when dataset.source = 'local'")
         return errors
 
 

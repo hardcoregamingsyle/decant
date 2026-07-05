@@ -14,7 +14,7 @@ train.lora.targets = "attention"
 
 # Local dataset (CSV / JSON / text file)
 dataset.source = "local"
-dataset.path = "./my_dataset.json"
+dataset.local_path = "./my_dataset.json"
 dataset.format = "text"
 dataset.text.field = "content"
 
