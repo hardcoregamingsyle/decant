@@ -40,26 +40,30 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 
 def _model_loading_block(model: ModelConfig, precision: str = "4bit") -> str:
     """Generate the model loading block with optional 4-bit / 8-bit / 16-bit."""
-    load_in = {
-        "4bit": "load_in_4bit=True",
-        "8bit": "load_in_8bit=True",
-        "16bit": "load_in_4bit=False",
-        "32bit": "load_in_4bit=False",
-    }
-    precision_flag = load_in.get(precision, "load_in_4bit=True")
+    if precision == "4bit":
+        load_in_4bit = "True"
+        load_in_8bit = "False"
+    elif precision == "8bit":
+        load_in_4bit = "False"
+        load_in_8bit = "True"
+    else:
+        load_in_4bit = "False"
+        load_in_8bit = "False"
+
     return f'''\
-# ── Load model & tokenizer ──────────────────────────────────────────
-model_name = "{model.base}"
+    # ── Load model & tokenizer ──────────────────────────────────────────
+    model_name = "{model.base}"
 
-max_seq_length = {model.context_extend or model.context}
+    max_seq_length = {model.context_extend or model.context}
 
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=model_name,
-    max_seq_length=max_seq_length,
-    dtype=None,  # auto-detect
-    load_in_4bit={"True" if precision == "4bit" else ("False" if precision == "16bit" else "True")},
-    device_map="auto",
-)'''
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_name,
+        max_seq_length=max_seq_length,
+        dtype=None,  # auto-detect
+        load_in_4bit={load_in_4bit},
+        load_in_8bit={load_in_8bit},
+        device_map="auto",
+    )'''
 
 
 def _context_extension_block(model: ModelConfig) -> str:
@@ -144,6 +148,8 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
     )''')
 
     if dataset.format in ("alpaca", "sharegpt"):
+        alpaca_fmt = 'f"### Instruction:\\n{instruction}\\n\\n### Input:\\n{inp}\\n\\n### Output:\\n{output}"'
+        alpaca_fmt_no_input = 'f"### Instruction:\\n{instruction}\\n\\n### Output:\\n{output}"'
         blocks.append(f'''\
     # ── Format dataset for instruction tuning ───────────────────────
     def format_func(examples):
@@ -154,12 +160,9 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
                 inp = examples.get("input", examples.get("input_text", examples.get("context", [""])))[i] or ""
                 output = examples.get("output", examples.get("response", [""]))[i] or ""
                 if inp:
-                    texts.append(f"### Instruction:\\n{instruction}\\\
-\\n### Input:\\n{inp}\\\
-\\n### Output:\\n{output}")
+                    texts.append({alpaca_fmt})
                 else:
-                    texts.append(f"### Instruction:\\n{instruction}\\\
-\\n### Output:\\n{output}")
+                    texts.append({alpaca_fmt_no_input})
             except (IndexError, KeyError):
                 texts.append("")
         return texts
@@ -381,42 +384,41 @@ def generate_code(config: NexusConfig, output_dir: Optional[str] = None) -> str:
     ]
 
     _append(parts, "    try:\n", 0)
+    _append(parts, _model_loading_block(config.model, config.train.precision), 1)
+    _append(parts, "\n", 0)
 
-        _append(parts, textwrap.indent(_model_loading_block(config.model, config.train.precision), "        "), 1)
+    ctx = _context_extension_block(config.model)
+    _append(parts, ctx, 1)
+    _append(parts, "\n", 0)
+
+    if config.train.compression in ("qlora", "lora"):
+        _append(parts, _lora_block(config.train.lora), 1)
         _append(parts, "\n", 0)
 
-        ctx = _context_extension_block(config.model)
-        _append(parts, textwrap.indent(ctx, "        "), 1)
+    if config.train.purpose != "host":
+        _append(parts, _dataset_block(config.dataset, config.train), 1)
         _append(parts, "\n", 0)
 
-        if config.train.compression in ("qlora", "lora"):
-            _append(parts, textwrap.indent(_lora_block(config.train.lora), "        "), 1)
-            _append(parts, "\n", 0)
+        trainer_code = _training_block(config.train, config.model, str(config.output.resolve_path()))
+        _append(parts, trainer_code, 1)
 
-        if config.train.purpose != "host":
-            _append(parts, textwrap.indent(_dataset_block(config.dataset, config.train), "        "), 1)
-            _append(parts, "\n", 0)
+        _append(parts, _output_block(config.output), 1)
+    else:
+        _append(parts, "        # Host mode: model loaded, no training needed.\n", 0)
+        _append(parts, f'        print("✔ Model loaded: {config.model.base}")\n', 0)
+        _append(parts, f'        print(f"  Context window: {{model.config.max_position_embeddings}} tokens")\n', 0)
 
-            trainer_code = _training_block(config.train, config.model, str(config.output.resolve_path()))
-            _append(parts, textwrap.indent(trainer_code, "        "), 1)
+    _append(parts, "\n", 0)
 
-            _append(parts, textwrap.indent(_output_block(config.output), "        "), 1)
-        else:
-            _append(parts, "        # Host mode: model loaded, no training needed.\n", 0)
-            _append(parts, f'        print("✔ Model loaded: {config.model.base}")\n', 0)
-            _append(parts, f'        print(f"  Context window: {{model.config.max_position_embeddings}} tokens")\n', 0)
-
-        _append(parts, "\n", 0)
-
-        # Error handling
-        _append(parts, '    except Exception as e:\n', 0)
-        _append(parts, '        tb = traceback.format_exc()\n', 0)
-        _append(parts, "        print('\\n❌ Training failed — here\\'s what happened in plain English:')\n", 0)
-        _append(parts, '        print("─" * 50)\n', 0)
-        _append(parts, '        print(handle_error(e, tb))\n', 0)
-        _append(parts, "        print('\\nFull technical details:')\n", 0)
-        _append(parts, '        print(tb)\n', 0)
-        _append(parts, '        sys.exit(1)\n', 0)
+    # Error handling
+    _append(parts, '    except Exception as e:\n', 0)
+    _append(parts, '        tb = traceback.format_exc()\n', 0)
+    _append(parts, "        print('\\n❌ Training failed — here\\'s what happened in plain English:')\n", 0)
+    _append(parts, '        print("─" * 50)\n', 0)
+    _append(parts, '        print(handle_error(e, tb))\n', 0)
+    _append(parts, "        print('\\nFull technical details:')\n", 0)
+    _append(parts, '        print(tb)\n', 0)
+    _append(parts, '        sys.exit(1)\n', 0)
 
     _append(parts, '\n\nif __name__ == "__main__":\n', 0)
     _append(parts, '    main()\n', 0)

@@ -33,15 +33,21 @@ def _get_parser() -> Lark:
 # Value coercion helpers
 # ---------------------------------------------------------------------------
 
-def _coerce_value(token: Token):
-    """Turn a Lark token into a Python value."""
-    text = token.value.strip()
+def _coerce_value(node: Token | Tree):
+    """Turn a Lark Token or Tree into a Python value."""
+    # If it's a Tree (e.g. string/number/boolean), unwrap to find the Token
+    if isinstance(node, Tree):
+        if node.children:
+            return _coerce_value(node.children[0])
+        return None
+    # It's a Token
+    text = node.value.strip()
     if text.startswith('"') or text.startswith("'"):
         return ast.literal_eval(text)
     if text.startswith("["):
-        return _parse_list(token)
+        return _parse_list(node)
     if text.startswith("{"):
-        return _parse_inline_map(token)
+        return _parse_inline_map(node)
     if text in ("true", "false"):
         return text == "true"
     try:

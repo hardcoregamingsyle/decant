@@ -216,12 +216,15 @@ class NexusConfig:
 
     def validate(self) -> list[str]:
         """Run all sub-validations. Returns a flat list of error messages."""
-        return (
+        errors = (
             self.model.validate()
             + self.train.validate()
-            + self.dataset.validate()
             + self.output.validate()
         )
+        # Dataset is only required when training/fine-tuning
+        if self.train.purpose != "host":
+            errors += self.dataset.validate()
+        return errors
 
     @property
     def is_valid(self) -> bool:

@@ -1,9 +1,8 @@
 // Nexus DSL Grammar
 // A minimal language for specifying AI model training/hosting configs
 
-start: _NL* statement* _NL*
+start: _NL* assignment (_NL+ assignment)* _NL*
 
-statement: assignment _NL+
 assignment: dotted_key "=" value
 
 dotted_key: CNAME ("." CNAME)*
