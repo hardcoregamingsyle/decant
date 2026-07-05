@@ -3,7 +3,7 @@ Name: decant-dsl
 Version: 0.1.0
 Summary: Decant — A minimal DSL for AI model training & hosting with VRAM optimization
 Author: Decant Contributors
-License: MIT
+License-Expression: MIT
 Project-URL: Homepage, https://github.com/decant-dsl/decant
 Project-URL: Documentation, https://decant-dsl.dev
 Classifier: Development Status :: 3 - Alpha
