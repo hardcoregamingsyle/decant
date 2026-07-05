@@ -38,7 +38,7 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 '''
 
 
-def _model_loading_block(model: ModelConfig) -> str:
+def _model_loading_block(model: ModelConfig, precision: str = "4bit") -> str:
     """Generate the model loading block with optional 4-bit / 8-bit / 16-bit."""
     load_in = {
         "4bit": "load_in_4bit=True",
@@ -46,7 +46,7 @@ def _model_loading_block(model: ModelConfig) -> str:
         "16bit": "load_in_4bit=False",
         "32bit": "load_in_4bit=False",
     }
-    precision_flag = load_in.get(model.source == "huggingface" and "4bit" or "4bit", "load_in_4bit=True")
+    precision_flag = load_in.get(precision, "load_in_4bit=True")
     return f'''\
 # ── Load model & tokenizer ──────────────────────────────────────────
 model_name = "{model.base}"
@@ -57,7 +57,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=model_name,
     max_seq_length=max_seq_length,
     dtype=None,  # auto-detect
-    {precision_flag if model.source == "huggingface" else "load_in_4bit=True"},
+    load_in_4bit={"True" if precision == "4bit" else ("False" if precision == "16bit" else "True")},
     device_map="auto",
 )'''
 
@@ -154,9 +154,12 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
                 inp = examples.get("input", examples.get("input_text", examples.get("context", [""])))[i] or ""
                 output = examples.get("output", examples.get("response", [""]))[i] or ""
                 if inp:
-                    texts.append(f"### Instruction:\\\\n{{instruction}}\\\\n\\\\n### Input:\\\\n{{inp}}\\\\n\\\\n### Output:\\\\n{{output}}")
+                    texts.append(f"### Instruction:\\n{instruction}\\\
+\\n### Input:\\n{inp}\\\
+\\n### Output:\\n{output}")
                 else:
-                    texts.append(f"### Instruction:\\\\n{{instruction}}\\\\n\\\\n### Output:\\\\n{{output}}")
+                    texts.append(f"### Instruction:\\n{instruction}\\\
+\\n### Output:\\n{output}")
             except (IndexError, KeyError):
                 texts.append("")
         return texts
@@ -193,7 +196,7 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
     return "\n".join(blocks)
 
 
-def _training_block(train: TrainConfig, model: ModelConfig) -> str:
+def _training_block(train: TrainConfig, model: ModelConfig, output_dir: str) -> str:
     """Generate SFTTrainer + TrainingArguments block."""
     max_seq = model.context_extend or model.context
 
@@ -208,7 +211,7 @@ def _training_block(train: TrainConfig, model: ModelConfig) -> str:
     return f'''\
     # ── Training arguments ───────────────────────────────────────────
     training_args = TrainingArguments(
-        output_dir="{train.output_dir or "./outputs/nexus-training"}",
+        output_dir="{output_dir}",
         per_device_train_batch_size={train.batch_size},
         gradient_accumulation_steps={train.gradient_accumulation},
         warmup_steps={train.warmup_steps},
@@ -377,10 +380,9 @@ def generate_code(config: NexusConfig, output_dir: Optional[str] = None) -> str:
         "def main():\n",
     ]
 
-    try:
-        _append(parts, "    try:\n", 0)
+    _append(parts, "    try:\n", 0)
 
-        _append(parts, textwrap.indent(_model_loading_block(config.model), "        "), 1)
+        _append(parts, textwrap.indent(_model_loading_block(config.model, config.train.precision), "        "), 1)
         _append(parts, "\n", 0)
 
         ctx = _context_extension_block(config.model)
@@ -395,7 +397,7 @@ def generate_code(config: NexusConfig, output_dir: Optional[str] = None) -> str:
             _append(parts, textwrap.indent(_dataset_block(config.dataset, config.train), "        "), 1)
             _append(parts, "\n", 0)
 
-            trainer_code = _training_block(config.train, config.model)
+            trainer_code = _training_block(config.train, config.model, str(config.output.resolve_path()))
             _append(parts, textwrap.indent(trainer_code, "        "), 1)
 
             _append(parts, textwrap.indent(_output_block(config.output), "        "), 1)
@@ -409,18 +411,15 @@ def generate_code(config: NexusConfig, output_dir: Optional[str] = None) -> str:
         # Error handling
         _append(parts, '    except Exception as e:\n', 0)
         _append(parts, '        tb = traceback.format_exc()\n', 0)
-        _append(parts, '        print("\\n❌ Training failed — here\\'s what happened in plain English:")\n', 0)
+        _append(parts, "        print('\\n❌ Training failed — here\\'s what happened in plain English:')\n", 0)
         _append(parts, '        print("─" * 50)\n', 0)
         _append(parts, '        print(handle_error(e, tb))\n', 0)
-        _append(parts, '        print("\\nFull technical details:")\n', 0)
+        _append(parts, "        print('\\nFull technical details:')\n", 0)
         _append(parts, '        print(tb)\n', 0)
         _append(parts, '        sys.exit(1)\n', 0)
 
-        _append(parts, '\n\nif __name__ == "__main__":\n', 0)
-        _append(parts, '    main()\n', 0)
-
-    except Exception as e:
-        return f'# GENERATION ERROR: {e}\nraise SystemExit(1)'
+    _append(parts, '\n\nif __name__ == "__main__":\n', 0)
+    _append(parts, '    main()\n', 0)
 
     return "".join(parts)
 
