@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "decant-dsl"
-version = "0.1.0"
+version = "0.1.1"
 description = "Decant — A minimal DSL for AI model training & hosting with VRAM optimization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,6 +34,7 @@ Documentation = "https://decant-dsl.dev"
 decant = "decant.cli:main"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["decant*"]
 
 [tool.setuptools.package-data]
