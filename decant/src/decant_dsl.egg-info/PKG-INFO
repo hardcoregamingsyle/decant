@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: decant-dsl
-Version: 0.1.1
+Version: 0.1.2
 Summary: Decant — A minimal DSL for AI model training & hosting with VRAM optimization
 Author: Decant Contributors
 License-Expression: MIT
