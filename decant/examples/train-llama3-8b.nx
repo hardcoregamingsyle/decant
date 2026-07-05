@@ -1,0 +1,45 @@
+# Decant Configuration — Fine-tune Llama 3.2 3B Instruct
+# This trains a 3B parameter model on a conversational dataset
+# using QLoRA (4-bit) for maximum VRAM efficiency.
+
+# Purpose: train, fine-tune, or host
+purpose = "fine-tune"
+
+# Model source: "huggingface" or "local"
+model.base = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit"
+model.source = "huggingface"
+
+# Training precision
+train.precision = "4bit"
+
+# Compression method: "qlora", "lora", "full", or "none"
+train.compression = "qlora"
+
+# LoRA hyper-parameters
+train.lora.rank = 16
+train.lora.alpha = 16
+train.lora.dropout = 0.0
+train.lora.targets = "all"
+
+# Dataset — using Hugging Face
+dataset.path = "databricks/databricks-dolly-15k"
+dataset.source = "huggingface"
+dataset.format = "alpaca"
+
+# Context window — extend from 2048 to 4096 with YaRN
+model.context = 2048
+model.context_extend = 4096
+model.context_method = "yarn"
+
+# Training hyper-parameters
+train.steps = 100
+train.batch.size = 2
+train.gradient.accumulation = 4
+train.learning.rate = 2e-4
+train.warmup.steps = 5
+train.optimizer = "adamw_8bit"
+train.scheduler = "cosine"
+
+# Output
+output.dir = "./outputs"
+output.name = "llama3-finetuned"

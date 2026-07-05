@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "decant-dsl"
+version = "0.1.0"
+description = "Decant — A minimal DSL for AI model training & hosting with VRAM optimization"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Decant Contributors"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "lark>=1.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/decant-dsl/decant"
+Documentation = "https://decant-dsl.dev"
+
+[project.scripts]
+decant = "decant.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["decant*"]
+
+[tool.setuptools.package-data]
+decant = ["grammar.lark"]

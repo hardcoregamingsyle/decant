@@ -1,0 +1,32 @@
+# Decant Configuration — Train with Local Dataset
+# Example of using a local model and dataset for offline training.
+
+purpose = "train"
+
+model.base = "unsloth/gemma-2-2b-it-bnb-4bit"
+model.source = "huggingface"
+
+train.precision = "4bit"
+train.compression = "qlora"
+train.lora.rank = 8
+train.lora.alpha = 16
+train.lora.targets = "attention"
+
+# Local dataset (CSV / JSON / text file)
+dataset.source = "local"
+dataset.local_path = "./my_dataset.json"
+dataset.format = "text"
+dataset.text.field = "content"
+
+# Keep context modest for 2B model
+model.context = 2048
+
+# Training params
+train.steps = 50
+train.batch.size = 1
+train.gradient.accumulation = 8
+train.learning.rate = 1e-4
+train.optimizer = "adamw_8bit"
+
+output.dir = "./outputs"
+output.name = "custom-finetuned"

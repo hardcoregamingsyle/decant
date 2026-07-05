@@ -1,0 +1,37 @@
+// Nexus DSL Grammar
+// A minimal language for specifying AI model training/hosting configs
+
+start: _NL* assignment (_NL+ assignment)* _NL*
+
+assignment: dotted_key "=" value
+
+dotted_key: CNAME ("." CNAME)*
+
+value: string
+     | number
+     | boolean
+     | list
+     | inline_map
+
+string: ESCAPED_STRING
+
+number: SIGNED_FLOAT | SIGNED_INT
+
+boolean: "true" | "false"
+
+list: "[" [_NL* value (_NL* "," _NL* value)* _NL*] "]"
+
+inline_map: "{" [_NL* inline_pair (_NL* "," _NL* inline_pair)* _NL*] "}"
+inline_pair: dotted_key "=" value
+
+COMMENT: /#[^\n]*/
+
+%import common.CNAME
+%import common.ESCAPED_STRING
+%import common.SIGNED_FLOAT
+%import common.SIGNED_INT
+%import common.WS_INLINE
+%import common.NEWLINE -> _NL
+
+%ignore COMMENT
+%ignore WS_INLINE
