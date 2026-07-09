@@ -69,14 +69,14 @@ def _model_loading_block(model: ModelConfig, precision: str = "4bit") -> str:
 def _context_extension_block(model: ModelConfig) -> str:
     """Generate YaRN / RoPE scaling block if context extension is configured."""
     if not model.context_extend or model.context_extend <= model.context:
-        return "    # No context extension needed\\n    pass"
+        return "    # No context extension needed\n    pass"
 
     if model.context_method == "yarn":
         scaling_config = (
-            f'        "rope_type": "yarn",\\n'
-            f'        "factor": {model.context_extend / model.context:.2f},\\n'
-            f'        "original_max_position_embeddings": {model.context},\\n'
-            f'        "attention_factor": {model.context_extend / model.context:.2f},\\n'
+            f'        "rope_type": "yarn",\n'
+            f'        "factor": {model.context_extend / model.context:.2f},\n'
+            f'        "original_max_position_embeddings": {model.context},\n'
+            f'        "attention_factor": {model.context_extend / model.context:.2f},\n'
         )
         return f'''\
     # -- Apply YaRN context extension -------------------------------------------------
@@ -148,8 +148,8 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
     )''')
 
     if dataset.format in ("alpaca", "sharegpt"):
-        alpaca_fmt = 'f"### Instruction:\\\\n{instruction}\\\\n\\\\n### Input:\\\\n{inp}\\\\n\\\\n### Output:\\\\n{output}"'
-        alpaca_fmt_no_input = 'f"### Instruction:\\\\n{instruction}\\\\n\\\\n### Output:\\\\n{output}"'
+        alpaca_fmt = 'f"### Instruction:\\n{instruction}\\n\\n### Input:\\n{inp}\\n\\n### Output:\\n{output}"'
+        alpaca_fmt_no_input = 'f"### Instruction:\\n{instruction}\\n\\n### Output:\\n{output}"'
         blocks.append(f'''\
     # -- Format dataset for instruction tuning -----------------------------------------
     def format_func(examples):
@@ -196,7 +196,7 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
         dataset = dataset.rename_column(dataset.column_names[0], "text")
 ''')
 
-    return "\\n".join(blocks)
+    return "\n".join(blocks)
 
 
 def _training_block(train: TrainConfig, model: ModelConfig, output_dir: str) -> str:
@@ -282,7 +282,7 @@ def _output_block(output: OutputConfig) -> str:
     print(f"✓ Model pushed to Hugging Face Hub: {{output.hub_id}}")
 ''')
 
-    return "\\n".join(blocks)
+    return "\n".join(blocks)
 
 
 def _error_wrapper_block() -> str:
@@ -295,60 +295,60 @@ def handle_error(exc: Exception, tb: str) -> str:
 
     if "cuda" in msg or "out of memory" in msg or "memory" in msg:
         return (
-            "[VRAM] Your GPU ran out of VRAM (video memory).\\\\n"
-            "   Try these fixes (from easiest to hardest):\\\\n"
-            "   1. Lower train.batch.size to 1\\\\n"
-            "   2. Use train.precision = '4bit' (you are probably already using this)\\\\n"
-            "   3. Lower model.context or model.context_extend\\\\n"
-            "   4. Set train.compression to 'qlora' and lower train.lora.rank to 8 or 4\\\\n"
-            "   5. Enable gradient checkpointing (it's already on by default)\\\\n"
+            "[VRAM] Your GPU ran out of VRAM (video memory).\\n"
+            "   Try these fixes (from easiest to hardest):\\n"
+            "   1. Lower train.batch.size to 1\\n"
+            "   2. Use train.precision = '4bit' (you are probably already using this)\\n"
+            "   3. Lower model.context or model.context_extend\\n"
+            "   4. Set train.compression to 'qlora' and lower train.lora.rank to 8 or 4\\n"
+            "   5. Enable gradient checkpointing (it's already on by default)\\n"
             "   Your GPU needs about 2-3x the model size in VRAM for training."
         )
     if "no module named" in msg:
         missing = msg.split("no module named")[-1].strip().strip("'\\\"")
         return (
-            f"[MISSING] Missing Python package: '{missing}'\\\\n"
+            f"[MISSING] Missing Python package: '{missing}'\\n"
             f"   Run: pip install {missing}"
         )
     if "connection" in msg or "timeout" in msg or "resolve" in msg:
         return (
-            "[NETWORK] Network error - could not download the model or dataset.\\\\n"
-            "   Check your internet connection and try again.\\\\n"
+            "[NETWORK] Network error - could not download the model or dataset.\\n"
+            "   Check your internet connection and try again.\\n"
             "   If Hugging Face is blocked in your region, use model.source = 'local'."
         )
     if "not found" in msg or "does not exist" in msg:
         return (
-            "[NOT FOUND] File or resource not found.\\\\n"
-            "   Check that the model name or dataset path is spelled correctly.\\\\n"
+            "[NOT FOUND] File or resource not found.\\n"
+            "   Check that the model name or dataset path is spelled correctly.\\n"
             "   For Hugging Face models, use format: 'org/model-name'"
         )
     if "permission" in msg or "access" in msg:
         return (
-            "[ACCESS] Permission denied.\\\\n"
-            "   You may need to log in: huggingface-cli login\\\\n"
+            "[ACCESS] Permission denied.\\n"
+            "   You may need to log in: huggingface-cli login\\n"
             "   Or the model/dataset may require special access."
         )
     if "tokenizer" in msg or "eos" in msg or "bos" in msg:
         return (
-            "[TOKENIZER] Tokenizer issue - the model's tokenizer couldn't be loaded correctly.\\\\n"
+            "[TOKENIZER] Tokenizer issue - the model's tokenizer couldn't be loaded correctly.\\n"
             "   Try a different model or check the model name."
         )
     if "shape" in msg or "dimension" in msg or "size mismatch" in msg:
         return (
-            "[TENSOR] Tensor shape mismatch - often caused by context window issues.\\\\n"
+            "[TENSOR] Tensor shape mismatch - often caused by context window issues.\\n"
             "   Try reducing model.context or model.context_extend."
         )
     if "dataset" in msg and ("format" in msg or "column" in msg):
         return (
-            "[DATASET] Dataset format error - the dataset columns don't match what's expected.\\\\n"
+            "[DATASET] Dataset format error - the dataset columns don't match what's expected.\\n"
             "   Try dataset.format = 'text' for raw text, or 'alpaca' for instruction data."
         )
 
     # Default: show the actual error but in a friendlier wrapper
     return (
-        f"[ERROR] An unexpected error occurred: {exc_name}\\\\n"
-        f"   {str(exc)[:200]}\\\\n"
-        f"\\\\n"
+        f"[ERROR] An unexpected error occurred: {exc_name}\\n"
+        f"   {str(exc)[:200]}\\n"
+        f"\\n"
         f"   For support, share the full traceback above."
     )
 '''
@@ -374,54 +374,54 @@ def generate_code(config: NexusConfig, output_dir: Optional[str] = None) -> str:
         A standalone Python script ready to execute.
     """
     parts = [
-        '"""Auto-generated by Decant DSL - VRAM-optimized training."""\\n',
+        '"""Auto-generated by Decant DSL - VRAM-optimized training."""\n',
         _IMPORTS,
         "",
         _error_wrapper_block(),
         "",
-        "\\n# -- Main training function --------------------------------------------------------\\n",
-        "def main():\\n",
+        "\n# -- Main training function --------------------------------------------------------\n",
+        "def main():\n",
     ]
 
-    _append(parts, "    try:\\n", 0)
+    _append(parts, "    try:\n", 0)
     _append(parts, _model_loading_block(config.model, config.train.precision), 1)
-    _append(parts, "\\n", 0)
+    _append(parts, "\n", 0)
 
     ctx = _context_extension_block(config.model)
     _append(parts, ctx, 1)
-    _append(parts, "\\n", 0)
+    _append(parts, "\n", 0)
 
     if config.train.compression in ("qlora", "lora"):
         _append(parts, _lora_block(config.train.lora), 1)
-        _append(parts, "\\n", 0)
+        _append(parts, "\n", 0)
 
     if config.train.purpose != "host":
         _append(parts, _dataset_block(config.dataset, config.train), 1)
-        _append(parts, "\\n", 0)
+        _append(parts, "\n", 0)
 
         trainer_code = _training_block(config.train, config.model, str(config.output.resolve_path()))
         _append(parts, trainer_code, 1)
 
         _append(parts, _output_block(config.output), 1)
     else:
-        _append(parts, "        # Host mode: model loaded, no training needed.\\n", 0)
-        _append(parts, f'        print("[OK] Model loaded: {config.model.base}")\\n', 0)
-        _append(parts, f'        print(f"  Context window: {{model.config.max_position_embeddings}} tokens")\\n', 0)
+        _append(parts, "        # Host mode: model loaded, no training needed.\n", 0)
+        _append(parts, f'        print("[OK] Model loaded: {config.model.base}")\n', 0)
+        _append(parts, f'        print(f"  Context window: {{model.config.max_position_embeddings}} tokens")\n', 0)
 
-    _append(parts, "\\n", 0)
+    _append(parts, "\n", 0)
 
     # Error handling
-    _append(parts, "    except Exception as e:\\n", 0)
-    _append(parts, "        tb = traceback.format_exc()\\n", 0)
-    _append(parts, "        print('\\\\n[FAIL] Training failed - here\\\\'s what happened in plain English:')\\n", 0)
-    _append(parts, '        print("-" * 50)\\n', 0)
-    _append(parts, "        print(handle_error(e, tb))\\n", 0)
-    _append(parts, "        print('\\\\nFull technical details:')\\n", 0)
-    _append(parts, "        print(tb)\\n", 0)
-    _append(parts, "        sys.exit(1)\\n", 0)
+    _append(parts, "    except Exception as e:\n", 0)
+    _append(parts, "        tb = traceback.format_exc()\n", 0)
+    _append(parts, "        print('\\n[FAIL] Training failed - here\\'s what happened in plain English:')\n", 0)
+    _append(parts, '        print("-" * 50)\n', 0)
+    _append(parts, "        print(handle_error(e, tb))\n", 0)
+    _append(parts, "        print('\\nFull technical details:')\n", 0)
+    _append(parts, "        print(tb)\n", 0)
+    _append(parts, "        sys.exit(1)\n", 0)
 
-    _append(parts, "\\n\\nif __name__ == \\"__main__\\":\\n", 0)
-    _append(parts, "    main()\\n", 0)
+    _append(parts, '\n\nif __name__ == "__main__":\n', 0)
+    _append(parts, "    main()\n", 0)
 
     return "".join(parts)
 

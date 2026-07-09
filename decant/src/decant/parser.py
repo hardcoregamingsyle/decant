@@ -84,7 +84,7 @@ def _parse_inline_map(token: Token) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Nested-dict builder
+# Nested-dict builder & helpers
 # ---------------------------------------------------------------------------
 
 def _build_nested(flat: dict[str, object]) -> object:
@@ -108,6 +108,31 @@ def _build_nested(flat: dict[str, object]) -> object:
         target[parts[-1]] = value
 
     return root
+
+
+def _deep_get(d: dict, *keys, default=None):
+    """Traverse nested dicts to resolve values from dotted .nx keys.
+
+    Example:
+        _deep_get(train_data, "gradient.accumulation", "gradient_accumulation", default=4)
+        This will check:
+          1. train_data["gradient"]["accumulation"]  (nested path)
+          2. train_data["gradient_accumulation"]     (flat key)
+          3. return default=4 if neither found
+    """
+    for key in keys:
+        parts = key.split(".")
+        cur = d
+        found = True
+        for part in parts:
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                found = False
+                break
+        if found:
+            return cur
+    return default
 
 
 # ---------------------------------------------------------------------------
@@ -169,11 +194,11 @@ def parse_string(source: str, source_name: str = "<string>") -> NexusConfig:
             name=model_data.get("name", "decant-model"),
             base=model_data.get("base", ""),
             source=model_data.get("source", "huggingface"),
-            local_path=model_data.get("local_path", ""),
+            local_path=_deep_get(model_data, "local_path", "local-path", default=""),
             context=int(model_data.get("context", 2048)),
-            context_extend=int(model_data.get("context_extend", model_data.get("context-extend", 0))),
-            context_method=model_data.get("context_method", model_data.get("context-method", "yarn")),
-            rope_theta=float(model_data.get("rope_theta", model_data.get("rope-theta", 1_000_000.0))),
+            context_extend=int(_deep_get(model_data, "context_extend", "context-extend", default=0)),
+            context_method=_deep_get(model_data, "context_method", "context-method", default="yarn"),
+            rope_theta=float(_deep_get(model_data, "rope_theta", "rope-theta", default=1_000_000.0)),
         ),
         train=TrainConfig(
             purpose=train_data.get("purpose", "train"),
@@ -182,17 +207,17 @@ def parse_string(source: str, source_name: str = "<string>") -> NexusConfig:
             lora=lora,
             steps=int(train_data.get("steps", 100)),
             epochs=int(train_data.get("epochs", 0)),
-            batch_size=int(train_data.get("batch_size", train_data.get("batch", {}).get("size", 2))),
-            gradient_accumulation=int(train_data.get("gradient_accumulation", train_data.get("gradient-accumulation", 4))),
-            learning_rate=float(train_data.get("learning_rate", train_data.get("learning-rate", train_data.get("learning.rate", 2e-4)))),
-            warmup_steps=int(train_data.get("warmup_steps", train_data.get("warmup-steps", 5))),
+            batch_size=int(_deep_get(train_data, "batch.size", "batch_size", default=2)),
+            gradient_accumulation=int(_deep_get(train_data, "gradient.accumulation", "gradient_accumulation", "gradient-accumulation", default=4)),
+            learning_rate=float(_deep_get(train_data, "learning.rate", "learning_rate", "learning-rate", default=2e-4)),
+            warmup_steps=int(_deep_get(train_data, "warmup.steps", "warmup_steps", "warmup-steps", default=5)),
             optimizer=train_data.get("optimizer", "adamw_8bit"),
             scheduler=train_data.get("scheduler", "cosine"),
-            weight_decay=float(train_data.get("weight_decay", train_data.get("weight-decay", 0.0))),
-            max_grad_norm=float(train_data.get("max_grad_norm", train_data.get("max-grad-norm", 1.0))),
-            logging_steps=int(train_data.get("logging_steps", train_data.get("logging-steps", 1))),
-            save_steps=int(train_data.get("save_steps", train_data.get("save-steps", 50))),
-            eval_steps=int(train_data.get("eval_steps", train_data.get("eval-steps", 50))),
+            weight_decay=float(_deep_get(train_data, "weight.decay", "weight_decay", "weight-decay", default=0.0)),
+            max_grad_norm=float(_deep_get(train_data, "max.grad.norm", "max_grad_norm", "max-grad-norm", default=1.0)),
+            logging_steps=int(_deep_get(train_data, "logging.steps", "logging_steps", "logging-steps", default=1)),
+            save_steps=int(_deep_get(train_data, "save.steps", "save_steps", "save-steps", default=50)),
+            eval_steps=int(_deep_get(train_data, "eval.steps", "eval_steps", "eval-steps", default=50)),
             seed=int(train_data.get("seed", 42)),
         ),
         dataset=DatasetConfig(
@@ -200,14 +225,14 @@ def parse_string(source: str, source_name: str = "<string>") -> NexusConfig:
             path=dataset_data.get("path", dataset_data.get("paths", "")),
             format=dataset_data.get("format", "text"),
             split=dataset_data.get("split", "train"),
-            text_field=dataset_data.get("text_field", dataset_data.get("text-field", "text")),
-            local_path=dataset_data.get("local_path", dataset_data.get("local-path", "")),
+            text_field=_deep_get(dataset_data, "text_field", "text-field", default="text"),
+            local_path=_deep_get(dataset_data, "local_path", "local-path", default=""),
         ),
         output=OutputConfig(
             dir=output_data.get("dir", "./outputs"),
             name=output_data.get("name", "decant-finetuned"),
-            push_to_hub=output_data.get("push_to_hub", output_data.get("push-to-hub", False)),
-            hub_id=output_data.get("hub_id", output_data.get("hub-id", "")),
+            push_to_hub=_deep_get(output_data, "push_to_hub", "push-to-hub", default=False),
+            hub_id=_deep_get(output_data, "hub_id", "hub-id", default=""),
         ),
     )
 
