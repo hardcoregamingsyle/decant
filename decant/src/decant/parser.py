@@ -35,8 +35,15 @@ def _get_parser() -> Lark:
 
 def _coerce_value(node: Token | Tree):
     """Turn a Lark Token or Tree into a Python value."""
-    # If it's a Tree (e.g. string/number/boolean), unwrap to find the Token
+    # Compound value types (list / inline_map) are represented as Trees that
+    # need their own dedicated handling *before* we fall through to the
+    # unwrap-the-first-child path below.
     if isinstance(node, Tree):
+        if node.data == "list":
+            return _parse_list(node)
+        if node.data == "inline_map":
+            return _parse_inline_map(node)
+        # Otherwise (string/number/boolean) unwrap to find the inner Token
         if node.children:
             return _coerce_value(node.children[0])
         return None
@@ -44,10 +51,6 @@ def _coerce_value(node: Token | Tree):
     text = node.value.strip()
     if text.startswith('"') or text.startswith("'"):
         return ast.literal_eval(text)
-    if text.startswith("["):
-        return _parse_list(node)
-    if text.startswith("{"):
-        return _parse_inline_map(node)
     if text in ("true", "false"):
         return text == "true"
     try:
@@ -59,27 +62,43 @@ def _coerce_value(node: Token | Tree):
             return text
 
 
-def _parse_list(token: Token) -> list:
+def _parse_list(tree: Tree) -> list:
     """Parse a Lark list tree into a Python list."""
     items = []
-    for child in token.children:
+    for child in tree.children:
         if isinstance(child, Tree) and child.data == "value":
             items.append(_coerce_value(child.children[0]))
+        elif isinstance(child, Tree):
+            # nested list / inline_map / other compound value
+            items.append(_coerce_value(child))
         elif isinstance(child, Token) and child.type not in ("_NL", "COMMA"):
             items.append(_coerce_value(child))
     return items
 
 
-def _parse_inline_map(token: Token) -> dict:
+def _parse_inline_map(tree: Tree) -> dict:
     """Parse an inline map { ... } into a Python dict."""
     result = {}
-    for child in token.children:
+    for child in tree.children:
         if isinstance(child, Tree) and child.data == "inline_pair":
-            key_parts = [c.value for c in child.children if isinstance(c, Token) and c.type == "CNAME"]
-            value_node = [c for c in child.children if isinstance(c, Tree) and c.data == "value"]
-            if key_parts and value_node:
+            key_node = next(
+                (c for c in child.children if isinstance(c, Tree) and c.data == "dotted_key"),
+                None,
+            )
+            value_node = next(
+                (c for c in child.children if isinstance(c, Tree) and c.data == "value"),
+                None,
+            )
+            if key_node is None or value_node is None:
+                continue
+            key_parts = [
+                c.value
+                for c in key_node.children
+                if isinstance(c, Token) and c.type == "CNAME"
+            ]
+            if key_parts:
                 key = ".".join(key_parts)
-                result[key] = _coerce_value(value_node[0].children[0])
+                result[key] = _coerce_value(value_node.children[0])
     return result
 
 
@@ -225,7 +244,7 @@ def parse_string(source: str, source_name: str = "<string>") -> NexusConfig:
             path=dataset_data.get("path", dataset_data.get("paths", "")),
             format=dataset_data.get("format", "text"),
             split=dataset_data.get("split", "train"),
-            text_field=_deep_get(dataset_data, "text_field", "text-field", default="text"),
+            text_field=_deep_get(dataset_data, "text_field", "text-field", "text.field", default="text"),
             local_path=_deep_get(dataset_data, "local_path", "local-path", default=""),
         ),
         output=OutputConfig(

@@ -165,10 +165,9 @@ def _dataset_block(dataset: DatasetConfig, train: TrainConfig) -> str:
                     texts.append({alpaca_fmt_no_input})
             except (IndexError, KeyError):
                 texts.append("")
-        return texts
+        return {{"text": texts}}
 
     dataset = dataset.map(format_func, batched=True, remove_columns=dataset.column_names)
-    dataset = dataset.rename_column("format_func__output_0", "text")
 ''')
     elif dataset.format == "chat":
         blocks.append(f'''\
