@@ -1,5 +1,13 @@
+import os
 import sys
-sys.path.insert(0, "/home/daytona/codebase")
+
+# Make the test run from anywhere: derive paths from this file's location
+# instead of a hardcoded sandbox path.
+_BASE = os.path.dirname(os.path.abspath(__file__))
+# The `nexus` package lives one level up from this script's directory.
+sys.path.insert(0, os.path.dirname(_BASE))
+
+_EXAMPLES = os.path.join(_BASE, "examples")
 
 print("=" * 60)
 print("TEST 1: Import modules")
@@ -12,7 +20,7 @@ print()
 print("=" * 60)
 print("TEST 2: Parse example .nx file (train-llama3-8b)")
 print("=" * 60)
-src = open("/home/daytona/codebase/nexus/examples/train-llama3-8b.nx").read()
+src = open(os.path.join(_EXAMPLES, "train-llama3-8b.nx")).read()
 config = parse_string(src)
 print(f"  Model:    {config.model.base}")
 print(f"  Purpose:  {config.train.purpose}")
@@ -56,7 +64,7 @@ print()
 print("=" * 60)
 print("TEST 5: Parse host example")
 print("=" * 60)
-src2 = open("/home/daytona/codebase/nexus/examples/host-mistral.nx").read()
+src2 = open(os.path.join(_EXAMPLES, "host-mistral.nx")).read()
 config2 = parse_string(src2)
 print(f"  Model:    {config2.model.base}")
 print(f"  Purpose:  {config2.train.purpose}")
@@ -68,7 +76,7 @@ print()
 print("=" * 60)
 print("TEST 6: Parse local dataset example")
 print("=" * 60)
-src3 = open("/home/daytona/codebase/nexus/examples/train-local-dataset.nx").read()
+src3 = open(os.path.join(_EXAMPLES, "train-local-dataset.nx")).read()
 config3 = parse_string(src3)
 print(f"  Model:    {config3.model.base}")
 print(f"  Dataset:  {config3.dataset.local_path}")
